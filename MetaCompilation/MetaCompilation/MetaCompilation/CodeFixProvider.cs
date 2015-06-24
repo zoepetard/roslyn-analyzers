@@ -355,6 +355,31 @@ namespace MetaCompilation
             return newDocument;
         }
 
+        private async Task<Document> IncorrectSigAsync(Document document, MethodDeclarationSyntax declaration, CancellationToken c)
+        {
+            SemanticModel semanticModel = await document.GetSemanticModelAsync();
+            var initializeDeclaration = BuildInitialize(document, semanticModel);
+
+            var root = await document.GetSyntaxRootAsync();
+            var newRoot = root.ReplaceNode(declaration, initializeDeclaration);
+            var newDocument = document.WithSyntaxRoot(newRoot);
+            return newDocument;
+        }
+
+        private async Task<Document> IncorrectIfAsync(Document document, StatementSyntax declaration, CancellationToken c)
+        {
+            var ifStatement = IfHelper(document);
+
+            var root = await document.GetSyntaxRootAsync();
+            var newRoot = root.ReplaceNode(declaration, ifStatement);
+            var newDocument = document.WithSyntaxRoot(newRoot);
+            return newDocument;
+        }
+        
+        #endregion
+
+        #region rule code fix
+
         private async Task<Document> InternalStaticAsync(Document document, FieldDeclarationSyntax declaration, CancellationToken c)
         {
             var whiteSpace = SyntaxFactory.Whitespace(" ");
@@ -369,18 +394,6 @@ namespace MetaCompilation
             return newDocument;
         }
 
-        private async Task<Document> IncorrectSigAsync(Document document, MethodDeclarationSyntax declaration, CancellationToken c)
-        {
-            SemanticModel semanticModel = await document.GetSemanticModelAsync();
-            var initializeDeclaration = BuildInitialize(document, semanticModel);
-
-            var root = await document.GetSyntaxRootAsync();
-            var newRoot = root.ReplaceNode(declaration, initializeDeclaration);
-            var newDocument = document.WithSyntaxRoot(newRoot);
-            return newDocument;
-        }
-
-
         private async Task<Document> EnabledByDefaultAsync(Document document, LiteralExpressionSyntax literalExpression, CancellationToken c)
         {
             var newLiteralExpression = (SyntaxFactory.ParseExpression("true").WithLeadingTrivia(literalExpression.GetLeadingTrivia()).WithTrailingTrivia(literalExpression.GetTrailingTrivia())) as LiteralExpressionSyntax;
@@ -391,16 +404,35 @@ namespace MetaCompilation
             return newDocument;
         }
 
-        private async Task<Document> IncorrectIfAsync(Document document, StatementSyntax declaration, CancellationToken c)
+        private async Task<Document> DiagnosticSeverityWarning(Document document, MemberAccessExpressionSyntax memberAccessExpression, CancellationToken c)
         {
-            var ifStatement = IfHelper(document);
+            var newMemberAccessExpressionName = SyntaxFactory.ParseName("Warning");
 
             var root = await document.GetSyntaxRootAsync();
-            var newRoot = root.ReplaceNode(declaration, ifStatement);
+            var newRoot = root.ReplaceNode(memberAccessExpression.Name, newMemberAccessExpressionName);
             var newDocument = document.WithSyntaxRoot(newRoot);
             return newDocument;
         }
 
+        private async Task<Document> DiagnosticSeverityHidden(Document document, MemberAccessExpressionSyntax memberAccessExpression, CancellationToken c)
+        {
+            var newMemberAccessExpressionName = SyntaxFactory.ParseName("Hidden");
+
+            var root = await document.GetSyntaxRootAsync();
+            var newRoot = root.ReplaceNode(memberAccessExpression.Name, newMemberAccessExpressionName);
+            var newDocument = document.WithSyntaxRoot(newRoot);
+            return newDocument;
+        }
+
+        private async Task<Document> DiagnosticSeverityInfo(Document document, MemberAccessExpressionSyntax memberAccessExpression, CancellationToken c)
+        {
+            var newMemberAccessExpressionName = SyntaxFactory.ParseName("Info");
+
+            var root = await document.GetSyntaxRootAsync();
+            var newRoot = root.ReplaceNode(memberAccessExpression.Name, newMemberAccessExpressionName);
+            var newDocument = document.WithSyntaxRoot(newRoot);
+            return newDocument;
+        }
 
         private async Task<Document> DiagnosticSeverityError(Document document, MemberAccessExpressionSyntax memberAccessExpression, CancellationToken c)
         {
@@ -408,6 +440,44 @@ namespace MetaCompilation
 
             var root = await document.GetSyntaxRootAsync();
             var newRoot = root.ReplaceNode(memberAccessExpression.Name, newMemberAccessExpressionName);
+            var newDocument = document.WithSyntaxRoot(newRoot);
+            return newDocument;
+        }
+
+        private async Task<Document> IdDeclTypeAsync(Document document, LiteralExpressionSyntax literalExpression, CancellationToken c)
+        {
+            var idName = SyntaxFactory.ParseName(literalExpression.Token.Value.ToString()) as IdentifierNameSyntax;
+
+            var root = await document.GetSyntaxRootAsync();
+            var newRoot = root.ReplaceNode(literalExpression, idName);
+            var newDocument = document.WithSyntaxRoot(newRoot);
+            return newDocument;
+        }
+
+        private async Task<Document> MissingIdDeclarationAsync(Document document, VariableDeclaratorSyntax ruleDeclarationField, CancellationToken c)
+        {
+            var classDeclaration = ruleDeclarationField.Parent.Parent.Parent as ClassDeclarationSyntax;
+            var objectCreationSyntax = ruleDeclarationField.Initializer.Value as ObjectCreationExpressionSyntax;
+            var ruleArgumentList = objectCreationSyntax.ArgumentList;
+
+            string currentRuleId = null;
+            for (int i = 0; i < ruleArgumentList.Arguments.Count; i++)
+            {
+                var currentArg = ruleArgumentList.Arguments[i];
+                string currentArgName = currentArg.NameColon.Name.Identifier.Text;
+                if (currentArgName == "id")
+                {
+                    currentRuleId = currentArg.Expression.ToString();
+                    break;
+                }
+            }
+
+            var idToken = SyntaxFactory.ParseToken(currentRuleId);
+            var expressionKind = SyntaxFactory.ParseExpression("\"DescriptiveId\"") as ExpressionSyntax;
+            var newClassDeclaration = newIdCreator(idToken, expressionKind, classDeclaration);
+
+            var root = await document.GetSyntaxRootAsync();
+            var newRoot = root.ReplaceNode(classDeclaration, newClassDeclaration);
             var newDocument = document.WithSyntaxRoot(newRoot);
             return newDocument;
         }
@@ -438,15 +508,7 @@ namespace MetaCompilation
             return newDocument;
         }
 
-        private async Task<Document> DiagnosticSeverityWarning(Document document, MemberAccessExpressionSyntax memberAccessExpression, CancellationToken c)
-        {
-            var newMemberAccessExpressionName = SyntaxFactory.ParseName("Warning");
 
-            var root = await document.GetSyntaxRootAsync();
-            var newRoot = root.ReplaceNode(memberAccessExpression.Name, newMemberAccessExpressionName);
-            var newDocument = document.WithSyntaxRoot(newRoot);
-            return newDocument;
-        }
 
         private async Task<Document> TrailingCheckIncorrectAsync(Document document, StatementSyntax declaration, CancellationToken c)
         {
@@ -458,15 +520,7 @@ namespace MetaCompilation
             return newDocument;
         }
 
-        private async Task<Document> DiagnosticSeverityHidden(Document document, MemberAccessExpressionSyntax memberAccessExpression, CancellationToken c)
-        {
-            var newMemberAccessExpressionName = SyntaxFactory.ParseName("Hidden");
 
-            var root = await document.GetSyntaxRootAsync();
-            var newRoot = root.ReplaceNode(memberAccessExpression.Name, newMemberAccessExpressionName);
-            var newDocument = document.WithSyntaxRoot(newRoot);
-            return newDocument;
-        }
 
         private async Task<Document> TrailingVarMissingAsync(Document document, IfStatementSyntax declaration, CancellationToken c)
         {
@@ -482,15 +536,7 @@ namespace MetaCompilation
         }
 
 
-        private async Task<Document> DiagnosticSeverityInfo(Document document, MemberAccessExpressionSyntax memberAccessExpression, CancellationToken c)
-        {
-            var newMemberAccessExpressionName = SyntaxFactory.ParseName("Info");
 
-            var root = await document.GetSyntaxRootAsync();
-            var newRoot = root.ReplaceNode(memberAccessExpression.Name, newMemberAccessExpressionName);
-            var newDocument = document.WithSyntaxRoot(newRoot);
-            return newDocument;
-        }
 
         private async Task<Document> TrailingVarIncorrectAsync(Document document, IfStatementSyntax declaration, CancellationToken c)
         {
@@ -535,97 +581,11 @@ namespace MetaCompilation
             return newDocument;
         }
 
-        private async Task<Document> IncorrectSigSuppDiagAsync(Document document, PropertyDeclarationSyntax declaration, CancellationToken c)
-        {
-            var whiteSpace = SyntaxFactory.Whitespace(" ");
-            var newIdentifier = SyntaxFactory.ParseToken("SupportedDiagnostics").WithLeadingTrivia(whiteSpace);
-            var publicKeyword = SyntaxFactory.ParseToken("public").WithTrailingTrivia(whiteSpace);
-            var overrideKeyword = SyntaxFactory.ParseToken("override").WithTrailingTrivia(whiteSpace);
-            var modifierList = SyntaxFactory.TokenList(publicKeyword, overrideKeyword);
-            var newPropertyDeclaration = declaration.WithIdentifier(newIdentifier).WithModifiers(modifierList).WithLeadingTrivia(declaration.GetLeadingTrivia()).WithTrailingTrivia(whiteSpace);
 
-            var root = await document.GetSyntaxRootAsync();
-            var newRoot = root.ReplaceNode(declaration, newPropertyDeclaration);
-            var newDocument = document.WithSyntaxRoot(newRoot);
 
-            return newDocument;
-         }
 
-        private async Task<Document> MissingAccessorAsync(Document document, PropertyDeclarationSyntax declaration, CancellationToken c)
-        {
-            var generator = SyntaxGenerator.GetGenerator(document);
-            SemanticModel semanticModel = await document.GetSemanticModelAsync();
-            INamedTypeSymbol notImplementedException = semanticModel.Compilation.GetTypeByMetadataName("System.NotImplementedException");
-            var throwStatement = new[] { generator.ThrowStatement(generator.ObjectCreationExpression(notImplementedException)) };
-            var type = generator.GetType(declaration);
-            var newPropertyDeclaration = generator.PropertyDeclaration("SupportedDiagnostics", type,
-                Accessibility.Public, DeclarationModifiers.Override, throwStatement) as PropertyDeclarationSyntax;
 
-            newPropertyDeclaration = newPropertyDeclaration.RemoveNode(newPropertyDeclaration.AccessorList.Accessors[1],0);
 
-            var root = await document.GetSyntaxRootAsync();
-            var newRoot = root.ReplaceNode(declaration, newPropertyDeclaration);
-            var newDocument = document.WithSyntaxRoot(newRoot);
-
-            return newDocument;
-        }
-
-        private async Task<Document> AccessorReturnValueAsync(Document document, PropertyDeclarationSyntax declaration, CancellationToken c)
-        {
-            var generator = SyntaxGenerator.GetGenerator(document);
-            var expressionString = generator.IdentifierName("ImmutableArray");
-            var identifierString = generator.IdentifierName("Create");
-            var expression = generator.MemberAccessExpression(expressionString, identifierString);
-            var invocationExpression = generator.InvocationExpression(expression);
-            var returnStatement = generator.ReturnStatement(invocationExpression) as ReturnStatementSyntax; //SyntaxFactory.ParseStatement("return ImmutableArray.Create();") as ReturnStatementSyntax;
-
-            var firstAccessor = declaration.AccessorList.Accessors.First();
-            var oldBody = firstAccessor.Body as BlockSyntax;
-            var oldReturnStatement = oldBody.Statements.First();
-
-            var root = await document.GetSyntaxRootAsync();
-            var newRoot = root;
-        
-            if (oldReturnStatement == null)
-            {
-                var newAccessorDeclaration = firstAccessor.AddBodyStatements(returnStatement);
-                newRoot = root.ReplaceNode(firstAccessor, newAccessorDeclaration);
-            }
-            else
-            {
-                newRoot = root.ReplaceNode(oldReturnStatement, returnStatement);
-            }
-            var newDocument = document.WithSyntaxRoot(newRoot);
-            return newDocument;
-        }
-
-        private async Task<Document> MissingIdDeclarationAsync(Document document, VariableDeclaratorSyntax ruleDeclarationField, CancellationToken c)
-        {
-            var classDeclaration = ruleDeclarationField.Parent.Parent.Parent as ClassDeclarationSyntax;
-            var objectCreationSyntax = ruleDeclarationField.Initializer.Value as ObjectCreationExpressionSyntax;
-            var ruleArgumentList = objectCreationSyntax.ArgumentList;
-
-            string currentRuleId = null;
-            for (int i = 0; i < ruleArgumentList.Arguments.Count; i++)
-            {
-                var currentArg = ruleArgumentList.Arguments[i];
-                string currentArgName = currentArg.NameColon.Name.Identifier.Text;
-                if (currentArgName == "id")
-                {
-                    currentRuleId = currentArg.Expression.ToString();
-                    break;
-                }
-            }
-
-            var idToken = SyntaxFactory.ParseToken(currentRuleId);
-            var expressionKind = SyntaxFactory.ParseExpression("\"DescriptiveId\"") as ExpressionSyntax;
-            var newClassDeclaration = newIdCreator(idToken, expressionKind, classDeclaration);
-
-            var root = await document.GetSyntaxRootAsync();
-            var newRoot = root.ReplaceNode(classDeclaration, newClassDeclaration);
-            var newDocument = document.WithSyntaxRoot(newRoot);
-            return newDocument;
-        }
 
         private async Task<Document> WhitespaceCheckIncorrectAsync(Document document, IfStatementSyntax declaration, CancellationToken c)
         {
@@ -657,15 +617,7 @@ namespace MetaCompilation
         }
 
 
-        private async Task<Document> IdDeclTypeAsync(Document document, LiteralExpressionSyntax literalExpression, CancellationToken c)
-        {
-            var idName = SyntaxFactory.ParseName(literalExpression.Token.Value.ToString()) as IdentifierNameSyntax;
 
-            var root = await document.GetSyntaxRootAsync();
-            var newRoot = root.ReplaceNode(literalExpression, idName);
-            var newDocument = document.WithSyntaxRoot(newRoot);
-            return newDocument;
-        }
         private async Task<Document> ReturnIncorrectAsync(Document document, IfStatementSyntax declaration, CancellationToken c)
         {
             IfStatementSyntax ifStatement;
@@ -806,6 +758,7 @@ namespace MetaCompilation
         }
         #endregion
 
+        #region supported diagnostics code fix
         private async Task<Document> TooManyAccessorsAsync(Document document, PropertyDeclarationSyntax declaration, CancellationToken c)
         {
             var allAccessors = declaration.AccessorList.Accessors.OfType<AccessorDeclarationSyntax>();
@@ -886,5 +839,70 @@ namespace MetaCompilation
 
             return document;
         }
+
+        private async Task<Document> IncorrectSigSuppDiagAsync(Document document, PropertyDeclarationSyntax declaration, CancellationToken c)
+        {
+            var whiteSpace = SyntaxFactory.Whitespace(" ");
+            var newIdentifier = SyntaxFactory.ParseToken("SupportedDiagnostics").WithLeadingTrivia(whiteSpace);
+            var publicKeyword = SyntaxFactory.ParseToken("public").WithTrailingTrivia(whiteSpace);
+            var overrideKeyword = SyntaxFactory.ParseToken("override").WithTrailingTrivia(whiteSpace);
+            var modifierList = SyntaxFactory.TokenList(publicKeyword, overrideKeyword);
+            var newPropertyDeclaration = declaration.WithIdentifier(newIdentifier).WithModifiers(modifierList).WithLeadingTrivia(declaration.GetLeadingTrivia()).WithTrailingTrivia(whiteSpace);
+
+            var root = await document.GetSyntaxRootAsync();
+            var newRoot = root.ReplaceNode(declaration, newPropertyDeclaration);
+            var newDocument = document.WithSyntaxRoot(newRoot);
+
+            return newDocument;
+        }
+
+        private async Task<Document> MissingAccessorAsync(Document document, PropertyDeclarationSyntax declaration, CancellationToken c)
+        {
+            var generator = SyntaxGenerator.GetGenerator(document);
+            SemanticModel semanticModel = await document.GetSemanticModelAsync();
+            INamedTypeSymbol notImplementedException = semanticModel.Compilation.GetTypeByMetadataName("System.NotImplementedException");
+            var throwStatement = new[] { generator.ThrowStatement(generator.ObjectCreationExpression(notImplementedException)) };
+            var type = generator.GetType(declaration);
+            var newPropertyDeclaration = generator.PropertyDeclaration("SupportedDiagnostics", type,
+                Accessibility.Public, DeclarationModifiers.Override, throwStatement) as PropertyDeclarationSyntax;
+
+            newPropertyDeclaration = newPropertyDeclaration.RemoveNode(newPropertyDeclaration.AccessorList.Accessors[1], 0);
+
+            var root = await document.GetSyntaxRootAsync();
+            var newRoot = root.ReplaceNode(declaration, newPropertyDeclaration);
+            var newDocument = document.WithSyntaxRoot(newRoot);
+
+            return newDocument;
+        }
+
+        private async Task<Document> AccessorReturnValueAsync(Document document, PropertyDeclarationSyntax declaration, CancellationToken c)
+        {
+            var generator = SyntaxGenerator.GetGenerator(document);
+            var expressionString = generator.IdentifierName("ImmutableArray");
+            var identifierString = generator.IdentifierName("Create");
+            var expression = generator.MemberAccessExpression(expressionString, identifierString);
+            var invocationExpression = generator.InvocationExpression(expression);
+            var returnStatement = generator.ReturnStatement(invocationExpression) as ReturnStatementSyntax; //SyntaxFactory.ParseStatement("return ImmutableArray.Create();") as ReturnStatementSyntax;
+
+            var firstAccessor = declaration.AccessorList.Accessors.First();
+            var oldBody = firstAccessor.Body as BlockSyntax;
+            var oldReturnStatement = oldBody.Statements.First();
+
+            var root = await document.GetSyntaxRootAsync();
+            var newRoot = root;
+
+            if (oldReturnStatement == null)
+            {
+                var newAccessorDeclaration = firstAccessor.AddBodyStatements(returnStatement);
+                newRoot = root.ReplaceNode(firstAccessor, newAccessorDeclaration);
+            }
+            else
+            {
+                newRoot = root.ReplaceNode(oldReturnStatement, returnStatement);
+            }
+            var newDocument = document.WithSyntaxRoot(newRoot);
+            return newDocument;
+        }
+        #endregion
     }
 }
