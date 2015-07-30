@@ -2183,7 +2183,7 @@ namespace MetaCompilation
                     return result;
                 }
 
-                if (returnSymbol.Type.ToString() != "System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor>" && returnSymbol.Type.Kind.ToString() != "ErrorType")
+                if (returnSymbol.Type.ToString() != "System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor>" && returnSymbol.Type.Kind != SymbolKind.ErrorType)
                 {
                     ReportDiagnostic(context, IncorrectAccessorReturnRule, returnSymbol.Locations[0]);
                     return result;
@@ -2210,6 +2210,29 @@ namespace MetaCompilation
                     ReportDiagnostic(context, IncorrectAccessorReturnRule, returnDeclaration.GetLocation());
                     return result;
                 }
+
+                var valueClauseMember = valueClause.Expression as MemberAccessExpressionSyntax;
+                if (valueClauseMember == null)
+                {
+                    ReportDiagnostic(context, IncorrectAccessorReturnRule, valueClause.GetLocation());
+                    return result;
+                }
+
+                var valueExpressionIdentifier = valueClauseMember.Expression as IdentifierNameSyntax;
+
+                if (valueExpressionIdentifier == null || valueExpressionIdentifier.Identifier.Text != "ImmutableArray")
+                {
+                    ReportDiagnostic(context, IncorrectAccessorReturnRule, valueClause.GetLocation());
+                    return result;
+                }
+
+                var valueNameIdentifier = valueClauseMember.Name as IdentifierNameSyntax;
+                if (valueNameIdentifier == null || valueNameIdentifier.Identifier.Text != "Create")
+                {
+                    ReportDiagnostic(context, IncorrectAccessorReturnRule, valueClause.GetLocation());
+                    return result;
+                }
+
 
                 result.ValueClause = valueClause;
                 result.ReturnDeclaration = returnDeclaration;
