@@ -595,7 +595,8 @@ namespace MetaCompilation
 
             var statements = declaration.Body.Statements.First() as ExpressionStatementSyntax;
             var invocationExpression = statements.Expression as InvocationExpressionSyntax;
-            string methodName = invocationExpression.ArgumentList.Arguments[0].ToString();
+            var methodIdentifier = invocationExpression.ArgumentList.Arguments[0].Expression as IdentifierNameSyntax;
+            string methodName = methodIdentifier.Identifier.Text;
 
             SemanticModel semanticModel = await document.GetSemanticModelAsync();
             SyntaxNode newAnalysisMethod = CodeFixNodeCreator.CreateAnalysisMethod(generator, methodName, semanticModel);
@@ -1065,8 +1066,9 @@ namespace MetaCompilation
             {
                 var expression = statement.Expression as InvocationExpressionSyntax;
                 var expressionStart = expression.Expression as MemberAccessExpressionSyntax;
-                if (expressionStart == null || expressionStart.Name == null ||
-                    expressionStart.Name.ToString() != "RegisterSyntaxNodeAction")
+                var expressionIdentifier = expressionStart.Name as IdentifierNameSyntax;
+                if (expressionIdentifier == null || expressionIdentifier.Identifier.Text == null ||
+                                    expressionIdentifier.Identifier.Text != "RegisterSyntaxNodeAction")
                 {
                     continue;
                 }
@@ -1225,7 +1227,8 @@ namespace MetaCompilation
                 string currentArgName = currentArg.NameColon.Name.Identifier.Text;
                 if (currentArgName == "id")
                 {
-                    currentRuleId = currentArg.Expression.ToString();
+                    var currentRuleIdentifier = currentArg.Expression as IdentifierNameSyntax;
+                    currentRuleId = currentRuleIdentifier.Identifier.Text;
                     break;
                 }
             }
@@ -1257,7 +1260,8 @@ namespace MetaCompilation
                     continue;
                 }
 
-                if (fieldDeclaration.Declaration.Type != null && fieldDeclaration.Declaration.Type.ToString() == "DiagnosticDescriptor")
+                var fieldType = fieldDeclaration.Declaration.Type as IdentifierNameSyntax;
+                if (fieldType != null && fieldType.Identifier.Text == "DiagnosticDescriptor")
                 {
                     rule = fieldDeclaration;
 
@@ -1305,7 +1309,7 @@ namespace MetaCompilation
                 {
                     var ruleIdSymbol = fieldDeclaration;
                     var ruleIdSyntax = ruleIdSymbol.Declaration.Variables[0] as VariableDeclaratorSyntax;
-                    var newIdIdentifier = ruleIdSyntax.Identifier.ToString();
+                    var newIdIdentifier = ruleIdSyntax.Identifier.Text;
                     newIdName = generator.IdentifierName(newIdIdentifier) as IdentifierNameSyntax;
                 }
             }
@@ -1443,8 +1447,8 @@ namespace MetaCompilation
             var fieldMembers = declaration.Members.OfType<FieldDeclarationSyntax>();
             foreach (FieldDeclarationSyntax fieldSyntax in fieldMembers)
             {
-                var fieldType = fieldSyntax.Declaration.Type;
-                if (fieldType != null && fieldType.ToString() == "DiagnosticDescriptor")
+                var fieldType = fieldSyntax.Declaration.Type as IdentifierNameSyntax;
+                if (fieldType != null && fieldType.Identifier.Text == "DiagnosticDescriptor")
                 {
                     var ruleName = fieldSyntax.Declaration.Variables[0].Identifier.Text;
                     ruleNames.Add(ruleName);
@@ -2009,7 +2013,8 @@ namespace MetaCompilation
                 foreach (var member in members)
                 {
                     rule = member as FieldDeclarationSyntax;
-                    if (rule != null && rule.Declaration.Type.ToString() == "DiagnosticDescriptor")
+                    var ruleType = rule.Declaration.Type as IdentifierNameSyntax;
+                    if (rule != null && ruleType != null && ruleType.Identifier.Text == "DiagnosticDescriptor")
                     {
                         break;
                     }
@@ -2178,8 +2183,8 @@ namespace MetaCompilation
                         {
                             if (parameters.Count > 0)
                             {
-                                var parameterType = parameters.First().Type;
-                                if (parameterType != null && parameterType.ToString() == "SyntaxNodeAnalysisContext")
+                                var parameterType = parameters.First().Type as IdentifierNameSyntax;
+                                if (parameterType != null && parameterType.Identifier.Text == "SyntaxNodeAnalysisContext")
                                 {
                                     return methodName = method.Identifier.Text;
                                 }
